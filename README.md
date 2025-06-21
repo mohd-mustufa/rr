@@ -17,3 +17,5 @@ OPENAI_API_KEY=
 JWT_SECRET=your_jwt_secret_key
 
 SERVER_IP=
+
+test
