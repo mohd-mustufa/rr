@@ -1,0 +1,34 @@
+{
+  "watch": [
+    "server.js",
+    "controllers/",
+    "routes/",
+    "middleware/",
+    "services/",
+    "database.js"
+  ],
+  "ignore": [
+    "uploads/",
+    "logs/",
+    "node_modules/",
+    "*.json",
+    "Dockerfile*",
+    "docker-compose*.yml",
+    ".dockerignore",
+    ".git/",
+    ".env*",
+    "README.md",
+    "DOCKER_README.md",
+    "*.sql",
+    "*.tmp",
+    "*.temp",
+    "frontend/",
+    "*.html",
+    "*.css"
+  ],
+  "ext": "js",
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "delay": "1000"
+} 

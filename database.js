@@ -1,6 +1,15 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
+// Validate required environment variables
+const requiredEnvVars = ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingVars.length > 0) {
+  console.error('Missing required environment variables:', missingVars);
+  process.exit(1);
+}
+
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -8,11 +17,36 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  acquireTimeout: 60000,
+  timeout: 60000,
+  reconnect: true
 });
+
+// Test database connection
+async function testConnection() {
+  try {
+    const connection = await pool.getConnection();
+    await connection.ping();
+    connection.release();
+    console.log('Database connection test successful');
+    return true;
+  } catch (error) {
+    console.error('Database connection test failed:', error.message);
+    return false;
+  }
+}
 
 async function initializeDatabase() {
   try {
+    console.log('Initializing database...');
+    
+    // Test connection first
+    const isConnected = await testConnection();
+    if (!isConnected) {
+      throw new Error('Cannot connect to database');
+    }
+    
     const connection = await pool.getConnection();
     
     // Create users table
@@ -89,4 +123,4 @@ async function initializeDatabase() {
   }
 }
 
-module.exports = { pool, initializeDatabase }; 
+module.exports = { pool, initializeDatabase, testConnection }; 
