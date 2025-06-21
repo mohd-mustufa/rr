@@ -290,6 +290,27 @@ function showLoading(show) {
 // Load user data from server
 async function loadUserData() {
     try {
+        // Clear any existing data from previous users
+        console.log('LUD: Clearing existing data...');
+        currentTitle = null;
+        currentReferenceDataMap = {}; // Clear reference data map
+        thumbnailsGrid.innerHTML = '';
+        thumbnailsEmptyState.style.display = 'block';
+        progressSection.style.display = 'none';
+        moreThumbnailsSection.style.display = 'none';
+        titleInput.value = '';
+        customInstructions.value = '';
+        quantitySelect.value = '5';
+        
+        // Clear reference images
+        globalReferenceImages.innerHTML = '<p class="empty-state">No reference images uploaded</p>';
+        titleReferenceImages.innerHTML = '<p class="empty-state">No reference images uploaded</p>';
+        
+        // Reset reference toggle
+        globalReferenceToggle.checked = true;
+        globalReferencesSection.style.display = 'block';
+        titleReferencesSection.style.display = 'none';
+        
         // Fetch titles
         console.log('LUD: Fetching titles...');
         const titlesResponse = await getTitles();
@@ -314,15 +335,7 @@ async function loadUserData() {
         document.getElementById('login-container').style.display = 'none';
         document.getElementById('app-container').style.display = 'flex';
 
-        // If titles are loaded, start polling for the first one for demonstration
-        if (titles && titles.length > 0) {
-            const firstTitleId = titles[0].id;
-            const defaultQuantity = 5;
-            console.log(`LUD: Automatically starting polling for title ID: ${firstTitleId}, quantity: ${defaultQuantity}`);
-            pollThumbnailStatus(firstTitleId, defaultQuantity);
-        } else {
-            console.log('LUD: No titles found, not starting auto-polling.');
-        }
+        // Don't automatically start polling - let user choose what to do
         console.log('LUD: User data loading complete.');
     } catch (error) {
         console.error('Error loading user data (LUD):', error);
@@ -403,6 +416,35 @@ function logout() {
     titles = [];
     globalReferences = [];
     currentTitle = null;
+    currentReferenceDataMap = {}; // Clear reference data map
+    
+    // Clear all UI elements
+    thumbnailsGrid.innerHTML = '';
+    thumbnailsEmptyState.style.display = 'block';
+    progressSection.style.display = 'none';
+    moreThumbnailsSection.style.display = 'none';
+    titleInput.value = '';
+    customInstructions.value = '';
+    quantitySelect.value = '5';
+    
+    // Clear reference images
+    globalReferenceImages.innerHTML = '<p class="empty-state">No reference images uploaded</p>';
+    titleReferenceImages.innerHTML = '<p class="empty-state">No reference images uploaded</p>';
+    
+    // Reset reference toggle
+    globalReferenceToggle.checked = true;
+    globalReferencesSection.style.display = 'block';
+    titleReferencesSection.style.display = 'none';
+    
+    // Clear titles list
+    titleList.innerHTML = '';
+    
+    // Clear username display
+    const usernameDisplay = document.getElementById('username-display');
+    if (usernameDisplay) {
+        usernameDisplay.textContent = '';
+    }
+    
     showLoginForm();
 }
 
@@ -463,18 +505,26 @@ function setupEventListeners() {
             const generateResponse = await generatePaintings(currentTitle.id, quantity);
             console.log("Generate thumbnails response:", generateResponse.data);
             
+            // Show progress section and create loading containers
+            progressSection.style.display = 'block';
+            thumbnailsEmptyState.style.display = 'none';
+            thumbnailsGrid.innerHTML = '';
+            
+            // Create loading containers for the expected thumbnails
+            for (let i = 0; i < quantity; i++) {
+                const thumbContainer = document.createElement('div');
+                thumbContainer.className = 'thumbnail-item';
+                thumbContainer.id = `thumb-${i}`;
+                
+                const loadingThumb = document.createElement('div');
+                loadingThumb.className = 'loading-thumbnail';
+                
+                thumbContainer.appendChild(loadingThumb);
+                thumbnailsGrid.appendChild(thumbContainer);
+            }
+            
             // Start polling for thumbnail status instead of loading immediately
             pollThumbnailStatus(currentTitle.id, quantity);
-
-            // Refresh titles list after starting generation/polling
-            console.log("Refreshing titles list");
-            const titlesResponse = await getTitles();
-            titles = titlesResponse.data.titles;
-            renderTitlesList();
-            
-            // No longer call loadThumbnails here immediately
-            // console.log("Loading thumbnails");
-            // await loadThumbnails(currentTitle.id);
         } catch (error) {
             console.error('Error generating thumbnails:', error);
             showLoading(false);
@@ -508,14 +558,34 @@ function setupEventListeners() {
             const quantity = parseInt(quantitySelect.value) || 3;
             
             // Generate more thumbnails
-            await generatePaintings(currentTitle.id, quantity);
+            const generateResponse = await generatePaintings(currentTitle.id, quantity);
+            console.log("Generate more response:", generateResponse.data);
             
-            // Get the updated thumbnails
-            await loadThumbnails(currentTitle.id);
+            // Show progress section
+            progressSection.style.display = 'block';
+            
+            // Get current number of thumbnails to determine starting index
+            const currentThumbnails = currentTitle.thumbnails || [];
+            const startIndex = currentThumbnails.length;
+            
+            // Create loading containers for the new thumbnails
+            for (let i = 0; i < quantity; i++) {
+                const thumbContainer = document.createElement('div');
+                thumbContainer.className = 'thumbnail-item';
+                thumbContainer.id = `thumb-${startIndex + i}`;
+                
+                const loadingThumb = document.createElement('div');
+                loadingThumb.className = 'loading-thumbnail';
+                
+                thumbContainer.appendChild(loadingThumb);
+                thumbnailsGrid.appendChild(thumbContainer);
+            }
+            
+            // Start polling for the new thumbnails
+            pollThumbnailStatus(currentTitle.id, quantity);
         } catch (error) {
             console.error('Error generating more thumbnails:', error);
             alert('Failed to generate additional thumbnails. Please try again.');
-        } finally {
             showLoading(false);
         }
     });
@@ -986,8 +1056,7 @@ function renderThumbnail(thumbnailData, index) {
     downloadBtn.textContent = 'Download';
     downloadBtn.addEventListener('click', (e) => {
         e.stopPropagation(); // Prevent opening modal when clicking download
-        // In a real app, this would download the image
-        alert(`Downloading: ${thumbnailData.summary}`);
+        downloadImage(thumbnailData.image_url, thumbnailData.summary);
     });
     
     const regenerateBtn = document.createElement('button');
@@ -1009,6 +1078,25 @@ function renderThumbnail(thumbnailData, index) {
     thumbContainer.addEventListener('click', () => {
         showPromptDetails(thumbnailData);
     });
+}
+
+// Download image function
+function downloadImage(imageUrl, filename) {
+    if (!imageUrl) {
+        alert('No image available to download');
+        return;
+    }
+    
+    // Create a temporary link element
+    const link = document.createElement('a');
+    link.href = imageUrl;
+    link.download = `${filename || 'painting'}.png`;
+    link.target = '_blank';
+    
+    // Append to body, click, and remove
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 // Show prompt details in modal
@@ -1335,7 +1423,7 @@ async function loadThumbnails(titleId) {
 // Poll for thumbnail generation status
 async function pollThumbnailStatus(titleId, expectedQuantity, attempt = 0) {
     console.log(`[Poll #${attempt + 1}] Entered pollThumbnailStatus for title ${titleId}`);
-    const maxAttempts = 40; // Poll for up to 2 minutes (40 * 3s)
+    const maxAttempts = 100; // Poll for up to 5 minutes (100 * 3s)
     const pollInterval = 3000; // Poll every 3 seconds
 
     if (attempt >= maxAttempts) {
@@ -1368,16 +1456,24 @@ async function pollThumbnailStatus(titleId, expectedQuantity, attempt = 0) {
         let processingCount = 0;
         let pendingCount = 0;
 
-        // Render each thumbnail with its current status
-        // We need to determine the correct index for rendering.
-        // If loadTitle fetches initial thumbnails, we might need to map by ID or rely on the ASC order.
-        // Assuming the index corresponds to the position in the ASC sorted list for this title.
+        // Update current title thumbnails
+        if (currentTitle && currentTitle.id === titleId) {
+            currentTitle.thumbnails = relevantThumbnails;
+        }
+
+        // Clear existing thumbnails and render all current ones
+        thumbnailsGrid.innerHTML = '';
+        thumbnailsEmptyState.style.display = 'none';
+
         relevantThumbnails.forEach((thumbnail, index) => {
-            // Ensure the container exists (it should have been created by generateServerThumbnails)
-            const containerExists = document.getElementById(`thumb-${index}`);
-            if (containerExists) {
-                 renderThumbnail(thumbnail, index);
-            }
+            // Create container for each thumbnail
+            const thumbContainer = document.createElement('div');
+            thumbContainer.className = 'thumbnail-item';
+            thumbContainer.id = `thumb-${index}`;
+            thumbnailsGrid.appendChild(thumbContainer);
+            
+            // Render the thumbnail
+            renderThumbnail(thumbnail, index);
 
             if (thumbnail.status === 'completed' || thumbnail.status === 'failed') {
                 completedCount++;
