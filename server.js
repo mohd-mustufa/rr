@@ -15,12 +15,12 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Serve static files (HTML, CSS, JS) - this must come before routes
+app.use(express.static(__dirname));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Serve static files (HTML, CSS, JS)
-app.use(express.static(path.join(__dirname)));
-
-// Routes
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/titles', titleRoutes);
 app.use('/api/paintings', paintingRoutes);
