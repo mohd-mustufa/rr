@@ -17,6 +17,9 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Serve static files (HTML, CSS, JS)
+app.use(express.static(path.join(__dirname)));
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/titles', titleRoutes);
@@ -33,7 +36,14 @@ app.get('/api/config', (req, res) => {
 
 // Root route
 app.get('/', (req, res) => {
-  res.json({ message: 'AI Image Generator API' });
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Catch-all route for SPA - serve index.html for any non-API routes
+app.get('*', (req, res) => {
+  if (!req.path.startsWith('/api/')) {
+    res.sendFile(path.join(__dirname, 'index.html'));
+  }
 });
 
 // Initialize database and start server
